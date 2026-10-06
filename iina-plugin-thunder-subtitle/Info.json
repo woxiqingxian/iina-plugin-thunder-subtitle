@@ -1,0 +1,26 @@
+{
+  "name": "Thunder Subtitle",
+  "identifier": "com.chanson.iina-plugin-thunder-subtitle",
+  "version": "1.0.1",
+  "description": "Search and download subtitles from the Thunder subtitle service.",
+  "author": {
+    "name": "Chanson"
+  },
+  "entry": "src/index.js",
+  "permissions": [
+    "network-request"
+  ],
+  "allowedDomains": [
+    "api-shoulei-ssl.xunlei.com",
+    "subtitle.v.geilijiasu.com"
+  ],
+  "sidebarTab": {
+    "name": "Thunder Subtitle"
+  },
+  "subtitleProviders": [
+    {
+      "id": "thunder-subtitle",
+      "name": "Thunder Subtitle"
+    }
+  ]
+}

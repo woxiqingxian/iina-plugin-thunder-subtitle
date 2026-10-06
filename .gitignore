@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+
+# The 1.0.0 package predates the sidebar fix. Keep only the current package
+# in version control.
+iina-plugin-thunder-subtitle-1.0.0.iinaplgz
