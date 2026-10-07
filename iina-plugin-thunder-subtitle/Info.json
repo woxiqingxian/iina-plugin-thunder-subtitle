@@ -1,7 +1,7 @@
 {
   "name": "Thunder Subtitle",
   "identifier": "com.chanson.iina-plugin-thunder-subtitle",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Search and download subtitles from the Thunder subtitle service.",
   "author": {
     "name": "Chanson"

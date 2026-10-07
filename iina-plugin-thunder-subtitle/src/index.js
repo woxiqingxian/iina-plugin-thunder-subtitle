@@ -92,14 +92,129 @@ async function requestSubtitles(name) {
   return Array.isArray(body.data) ? body.data : [];
 }
 
+function normalizeLanguage(value) {
+  const language = String(value || "").trim().toLowerCase().replace(/_/g, "-");
+  const labels = {
+    "zh-cn": "简体中文",
+    "zh-hans": "简体中文",
+    chs: "简体中文",
+    sc: "简体中文",
+    "zh-tw": "繁体中文",
+    "zh-hk": "繁体中文",
+    "zh-hant": "繁体中文",
+    cht: "繁体中文",
+    tc: "繁体中文",
+    zh: "中文",
+    chi: "中文",
+    zho: "中文",
+    en: "英文",
+    eng: "英文",
+    ja: "日文",
+    jpn: "日文",
+    ko: "韩文",
+    kor: "韩文",
+  };
+  return labels[language] || "";
+}
+
+function subtitleLanguages(data) {
+  const result = [];
+  const add = (label) => {
+    if (label && !result.includes(label)) result.push(label);
+  };
+
+  if (Array.isArray(data.languages)) {
+    data.languages.forEach((language) => add(normalizeLanguage(language)));
+  }
+
+  const name = String(data.name || "").toLowerCase().replace(/_/g, "-");
+  const hasToken = (pattern) => pattern.test(name);
+  if (hasToken(/(?:^|[-.\s])(?:zh-?(?:cn|hans)|chs|sc)(?=$|[-.\s])/)) add("简体中文");
+  if (hasToken(/(?:^|[-.\s])(?:zh-?(?:tw|hk|hant)|cht|tc)(?=$|[-.\s])/)) add("繁体中文");
+  if (hasToken(/(?:^|[-.\s])(?:en|eng)(?=$|[-.\s])/)) add("英文");
+  if (hasToken(/(?:^|[-.\s])(?:ja|jpn)(?=$|[-.\s])/)) add("日文");
+  if (hasToken(/(?:^|[-.\s])(?:ko|kor)(?=$|[-.\s])/)) add("韩文");
+
+  return result;
+}
+
+function subtitleHashName(item) {
+  const name = String((item && item.name) || "")
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.[^.]+$/, "")
+    .trim()
+    .toLowerCase();
+  return /^[a-f0-9]{32,64}$/.test(name) ? name : "";
+}
+
+function subtitleQuality(item) {
+  const score = Number(item && item.score) || 0;
+  const fingerprint = Number(item && (item.fingerprintf_score || item.fingerprint_score)) || 0;
+  return score + fingerprint;
+}
+
+function languagePriority(item) {
+  const languages = subtitleLanguages(item || {});
+  const hasSimplified = languages.includes("简体中文");
+  const hasTraditional = languages.includes("繁体中文");
+  const hasEnglish = languages.includes("英文");
+  if (hasSimplified && !hasEnglish) return 0;
+  if (hasTraditional && !hasEnglish) return 1;
+  if ((hasSimplified || hasTraditional) && hasEnglish) return 2;
+  if (languages.includes("中文")) return 3;
+  if (hasEnglish) return 4;
+  return languages.length > 0 ? 5 : 6;
+}
+
 function uniqueItems(items) {
-  const seen = new Set();
-  return items.filter((item) => {
-    const key = item && (item.cid || item.url);
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  const exactSeen = new Set();
+  const hashNames = new Set();
+  const result = [];
+
+  items.forEach((item) => {
+    if (!item) return;
+    const exactKey = item.cid || item.url;
+    if (!exactKey || exactSeen.has(exactKey)) return;
+    exactSeen.add(exactKey);
+
+    const hashName = subtitleHashName(item);
+    if (hashName && hashNames.has(hashName)) return;
+    if (hashName) hashNames.add(hashName);
+    result.push(item);
   });
+
+  return result.sort((left, right) => {
+    const languageDifference = languagePriority(left) - languagePriority(right);
+    if (languageDifference !== 0) return languageDifference;
+
+    const qualityDifference = subtitleQuality(right) - subtitleQuality(left);
+    if (qualityDifference !== 0) return qualityDifference;
+
+    return String(left.name || "").localeCompare(String(right.name || ""));
+  });
+}
+
+function annotateSameNameItems(items) {
+  const counts = new Map();
+  const indexes = new Map();
+  const itemName = (item) => String((item && item.name) || "").trim().toLowerCase();
+
+  items.forEach((item) => {
+    const name = itemName(item);
+    if (name) counts.set(name, (counts.get(name) || 0) + 1);
+  });
+
+  items.forEach((item) => {
+    const name = itemName(item);
+    const count = counts.get(name) || 0;
+    if (count <= 1) return;
+    const index = (indexes.get(name) || 0) + 1;
+    indexes.set(name, index);
+    item._iinaDisplayVariant = `版本 ${index}/${count}`;
+  });
+
+  return items;
 }
 
 function formatDuration(milliseconds) {
@@ -117,16 +232,22 @@ function formatDuration(milliseconds) {
 
 function subtitleDescription(item) {
   const data = item.data || {};
-  const languages = Array.isArray(data.languages)
-    ? data.languages.filter(Boolean).join(", ")
-    : "";
-  const left = [data.ext && data.ext.toUpperCase(), languages].filter(Boolean).join(" · ");
+  const languages = subtitleLanguages(data);
+  const language = languages.length > 0 ? languages.join(" / ") : "语言未知";
+  const extension = String(data.ext || "字幕").toUpperCase();
+  const source = String(data.extra_name || "").replace(/[（）()]/g, "").trim();
+  const variant = String(data._iinaDisplayVariant || "");
+  const rawName = String(data.name || "迅雷字幕").split(/[\\/]/).pop();
+  const nameWithoutExtension = rawName.replace(/\.[^.]+$/, "");
+  const displayName = /^[a-f0-9]{32,64}$/i.test(nameWithoutExtension)
+    ? `迅雷字幕 · ${nameWithoutExtension.slice(0, 8).toUpperCase()}`
+    : nameWithoutExtension;
   const duration = formatDuration(data.duration);
 
   return {
-    name: data.name || "Thunder subtitle",
-    left,
-    right: duration ? `时长 ${duration}` : "",
+    name: displayName,
+    left: [language, extension, variant, source].filter(Boolean).join(" · "),
+    right: duration,
   };
 }
 
@@ -167,8 +288,11 @@ subtitle.registerProvider(PROVIDER_ID, {
       if (items.length > 0) break;
     }
 
-    console.log(`Thunder subtitle search: ${candidates[0]}, ${items.length} result(s)`);
-    return uniqueItems(items).map((item) => subtitle.item(item));
+    const visibleItems = annotateSameNameItems(uniqueItems(items));
+    console.log(
+      `Thunder subtitle search: ${candidates[0]}, ${items.length} raw result(s), ${visibleItems.length} visible result(s)`
+    );
+    return visibleItems.map((item) => subtitle.item(item));
   },
 
   description: subtitleDescription,

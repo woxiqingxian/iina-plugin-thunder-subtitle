@@ -22,9 +22,10 @@
 2. 只向 `api-shoulei-ssl.xunlei.com` 发起搜索请求，只从 `subtitle.v.geilijiasu.com` 下载字幕，除非同时更新清单权限和安全校验。
 3. 保留 `response.statusCode`、响应体 `code` 和 `data` 的分层检查。HTTP 200 但 `data` 为空是正常的无结果状态，不应当当成接口异常。
 4. 保留 `cid` 或 URL 去重，避免 IINA 字幕选择窗口显示重复条目。
-5. 修改 `Info.json` 的 `identifier` 时，必须同步考虑 IINA 已安装目录中的旧插件和用户偏好键 `PluginEnabled.<identifier>`。
-6. 不要提交真实账号、Cookie、令牌、个人路径下的临时文件或下载得到的字幕内容。
-7. 生成的 `.iinaplgz` 必须来自当前源码，不能继续发布包含旧 `Info.json` 或旧入口脚本的安装包。
+5. 不得按普通文件名合并字幕；同名文件可能包含不同翻译或时间轴。只有 `cid`、URL 或内容哈希文件名完全一致时才能去重。
+6. 修改 `Info.json` 的 `identifier` 时，必须同步考虑 IINA 已安装目录中的旧插件和用户偏好键 `PluginEnabled.<identifier>`。
+7. 不要提交真实账号、Cookie、令牌、个人路径下的临时文件或下载得到的字幕内容。
+8. 生成的 `.iinaplgz` 必须来自当前源码，不能继续发布包含旧 `Info.json` 或旧入口脚本的安装包。
 
 ## 本地验证
 

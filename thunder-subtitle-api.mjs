@@ -190,18 +190,38 @@ export async function downloadSubtitle(item, options = {}) {
   }
 }
 
+function subtitleHashName(item) {
+  const name = String(item?.name || '')
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.[^.]+$/, '')
+    .trim()
+    .toLowerCase()
+  return /^[a-f0-9]{32,64}$/.test(name) ? name : ''
+}
+
 /**
- * 对搜索结果按 cid 或 URL 去重，同时保留原始顺序。
+ * 按 cid 或 URL 去除相同资源；哈希文件名完全一致时也视为相同内容。
+ * 普通文件名相同仍然保留，因为它们可能对应不同字幕内容。
  */
 export function dedupeSubtitles(items) {
   if (!Array.isArray(items)) return []
-  const seen = new Set()
-  return items.filter((item) => {
-    const key = item?.cid || item?.url
-    if (!key || seen.has(key)) return false
-    seen.add(key)
-    return true
+  const exactSeen = new Set()
+  const hashNames = new Set()
+  const result = []
+
+  items.forEach((item) => {
+    const exactKey = item?.cid || item?.url
+    if (!exactKey || exactSeen.has(exactKey)) return
+    exactSeen.add(exactKey)
+
+    const hashName = subtitleHashName(item)
+    if (hashName && hashNames.has(hashName)) return
+    if (hashName) hashNames.add(hashName)
+    result.push(item)
   })
+
+  return result
 }
 
 /**
